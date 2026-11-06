@@ -297,6 +297,11 @@ export type StorefrontThemeId = (typeof STOREFRONT_THEME_IDS)[number]
 export const STOREFRONT_PALETTE_KEYS = [
 	'acid',
 	'arcade',
+	// Auction page layouts (ADR-0023). Offered by pleb, elec and brut.
+	'auction-arena',
+	'auction-brutal-pink',
+	'auction-catalogue',
+	'auction-live-night',
 	'beetroot',
 	'blueprint',
 	'brutal',

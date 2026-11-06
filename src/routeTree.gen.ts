@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as CheckoutRouteImport } from './routes/checkout'
+import { Route as AuctionLayoutsRouteImport } from './routes/auction-layouts'
 import { Route as DashboardLayoutRouteImport } from './routes/_dashboard-layout'
 import { Route as VanityNameRouteImport } from './routes/$vanityName'
 import { Route as IndexRouteImport } from './routes/index'
@@ -65,6 +66,11 @@ const SetupRoute = SetupRouteImport.update({
 const CheckoutRoute = CheckoutRouteImport.update({
 	id: '/checkout',
 	path: '/checkout',
+	getParentRoute: () => rootRouteImport,
+} as any)
+const AuctionLayoutsRoute = AuctionLayoutsRouteImport.update({
+	id: '/auction-layouts',
+	path: '/auction-layouts',
 	getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardLayoutRoute = DashboardLayoutRouteImport.update({
@@ -296,6 +302,7 @@ const DashboardLayoutDashboardProductsAuctionsAuctionIdRoute = DashboardLayoutDa
 export interface FileRoutesByFullPath {
 	'/': typeof IndexRoute
 	'/$vanityName': typeof VanityNameRoute
+	'/auction-layouts': typeof AuctionLayoutsRoute
 	'/checkout': typeof CheckoutRoute
 	'/setup': typeof SetupRoute
 	'/auctions/$auctionId': typeof AuctionsAuctionIdRoute
@@ -344,6 +351,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
 	'/': typeof IndexRoute
 	'/$vanityName': typeof VanityNameRoute
+	'/auction-layouts': typeof AuctionLayoutsRoute
 	'/checkout': typeof CheckoutRoute
 	'/setup': typeof SetupRoute
 	'/auctions/$auctionId': typeof AuctionsAuctionIdRoute
@@ -394,6 +402,7 @@ export interface FileRoutesById {
 	'/': typeof IndexRoute
 	'/$vanityName': typeof VanityNameRoute
 	'/_dashboard-layout': typeof DashboardLayoutRouteWithChildren
+	'/auction-layouts': typeof AuctionLayoutsRoute
 	'/checkout': typeof CheckoutRoute
 	'/setup': typeof SetupRoute
 	'/auctions/$auctionId': typeof AuctionsAuctionIdRoute
@@ -444,6 +453,7 @@ export interface FileRouteTypes {
 	fullPaths:
 		| '/'
 		| '/$vanityName'
+		| '/auction-layouts'
 		| '/checkout'
 		| '/setup'
 		| '/auctions/$auctionId'
@@ -492,6 +502,7 @@ export interface FileRouteTypes {
 	to:
 		| '/'
 		| '/$vanityName'
+		| '/auction-layouts'
 		| '/checkout'
 		| '/setup'
 		| '/auctions/$auctionId'
@@ -541,6 +552,7 @@ export interface FileRouteTypes {
 		| '/'
 		| '/$vanityName'
 		| '/_dashboard-layout'
+		| '/auction-layouts'
 		| '/checkout'
 		| '/setup'
 		| '/auctions/$auctionId'
@@ -591,6 +603,7 @@ export interface RootRouteChildren {
 	IndexRoute: typeof IndexRoute
 	VanityNameRoute: typeof VanityNameRoute
 	DashboardLayoutRoute: typeof DashboardLayoutRouteWithChildren
+	AuctionLayoutsRoute: typeof AuctionLayoutsRoute
 	CheckoutRoute: typeof CheckoutRoute
 	SetupRoute: typeof SetupRoute
 	AuctionsAuctionIdRoute: typeof AuctionsAuctionIdRoute
@@ -620,6 +633,13 @@ declare module '@tanstack/react-router' {
 			path: '/checkout'
 			fullPath: '/checkout'
 			preLoaderRoute: typeof CheckoutRouteImport
+			parentRoute: typeof rootRouteImport
+		}
+		'/auction-layouts': {
+			id: '/auction-layouts'
+			path: '/auction-layouts'
+			fullPath: '/auction-layouts'
+			preLoaderRoute: typeof AuctionLayoutsRouteImport
 			parentRoute: typeof rootRouteImport
 		}
 		'/_dashboard-layout': {
@@ -1054,6 +1074,7 @@ const rootRouteChildren: RootRouteChildren = {
 	IndexRoute: IndexRoute,
 	VanityNameRoute: VanityNameRoute,
 	DashboardLayoutRoute: DashboardLayoutRouteWithChildren,
+	AuctionLayoutsRoute: AuctionLayoutsRoute,
 	CheckoutRoute: CheckoutRoute,
 	SetupRoute: SetupRoute,
 	AuctionsAuctionIdRoute: AuctionsAuctionIdRoute,

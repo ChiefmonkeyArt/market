@@ -161,3 +161,105 @@ needs its own review against ADR-0003 and ADR-0017 before merge.
 - **Unlimited nesting.** Rejected. Recursion makes size limits, mobile stacking and editor UX much harder for little
   gain on an auction page.
 - **System screens as optional blocks.** Rejected. Refund and outcome messages are obligations to every participant.
+
+## Amendment (2026-11): Stage 2, the real auction rules
+
+Status: Proposed. This amendment governs stage 2 only, when `auctions.$auctionId` renders through the layout system.
+Stage 1 (the `/auction-layouts` preview) is unchanged until the demo rules mode below lands.
+
+### Context
+
+The stage 1 demo engine was built for gameplay. The auction protocol (`AUCTIONS.md`, ADR-0003, ADR-0012, ADR-0017)
+behaves differently in four places that bidders can see:
+
+1. **No clock extension.** Bids in `[start_at, end_at]` pay the flat floor. Bids in `(end_at, max_end_at]` pay the
+   `min_bid_curve` floor, and `max_end_at` is a hard cutoff fixed at publish. The older scheme that shifted `end_at` is
+   retired (`AUCTIONS.md` §3).
+2. **The curve floor is a selection rule, not a validity rule.** A bid below it is valid but not leading. It keeps its
+   lock and refunds through the loser path. A compliant client must not hard-reject it, and the computed floor is only
+   a warning (`AUCTIONS.md` §3, ADR-0012 Phase 1).
+3. **Outbid ecash stays locked until `locktime = max_end_at + settlement_grace`.** Raising your own bid uses the
+   additive rebid chain: each new leg locks only the delta, and every leg shares the same locktime (`AUCTIONS.md`
+   §4.2.1).
+4. **Bids are pending until the verdict quorum classifies them.** After the lot closes, the winner must release the
+   derivation path before the seller can redeem. If the winner does not settle within `fallback_delay_sec`, the seller
+   may offer settlement to the second-highest valid bid. Every unsettled bid refunds at locktime (`AUCTIONS.md` §2,
+   §9).
+
+### Decisions
+
+**A1. Lifecycle phase replaces soft close.** `AuctionLotView` gains:
+
+- `phase: 'scheduled' | 'bidding' | 'final-call' | 'settling' | 'settled' | 'no-sale'`
+- `endAt`, `maxEndAt` and `locktime`
+- `curveFloorSats`, the floor right now during final call, or `null`
+
+`status` stays as a derived alias (`live` covers `bidding` and `final-call`), so stage 1 blocks keep working.
+`softCloseSeconds` is removed for real lots. `Countdown` shows "Bidding" until `endAt`, then "Final call" until
+`maxEndAt`, and its soft-close note becomes a final-call note.
+
+**A2. Under the curve floor is a warning, not a block.** `nextMinimumBidSats` remains the leading floor.
+`BidPanel` must allow a bid between the flat floor and the curve floor. It shows "valid, but will not lead" and asks
+for one confirmation. Only the engine can refuse a bid, and only for a validity rule.
+
+**A3. Outbid means locked, not refunded.** Notice kinds change:
+
+| Kind               | Fields                    | Meaning                                                        |
+| ------------------ | ------------------------- | -------------------------------------------------------------- |
+| `outbid`           | `byName`, `lockedUntil`   | You no longer lead. Your sats stay locked until `lockedUntil`. |
+| `refund-pending`   | `amountSats`, `unlocksAt` | A losing bid will refund at locktime.                          |
+| `refund-available` | `amountSats`              | Locktime has passed, so the refund can be swept.               |
+| `bid-pending`      | `amountSats`              | Published and waiting for validator classification.            |
+| `bid-invalid`      | `reason` (closed enum)    | Classified invalid, with the reason code from the verdicts.    |
+
+The stage 1 `refund` kind is kept for the demo only. Copy on real lots must never say "refunded" before locktime.
+
+**A4. Raising your own bid is a top-up.** Add `topUpBid(newTotalSats)` to `AuctionPageActions`. The engine
+publishes a rebid leg whose `amount` is the new total, and it locks only the delta. The viewer gains `lockedSats`
+(the sum of the viewer's legs) and `unlocksAt`. The outbid notice offers "Top up to X", which costs only
+`X − lockedSats`.
+
+**A5. Bid state is visible.** Each `AuctionLotViewBid` gains `state: 'pending' | 'valid' | 'invalid'`. `BidFeed` and
+`Leaderboard` show pending bids muted and hide invalid ones. "You lead" appears only once your top bid is `valid`. The
+leader and the winner come from the existing quorum and selection helpers (`computeValidatedBids`,
+`computeVerdictQuorum`), never from raw events.
+
+**A6. Settlement is a system screen.** Outcomes gain:
+
+| Kind             | Who          | Next step                                                                      |
+| ---------------- | ------------ | ------------------------------------------------------------------------------ |
+| `settling`       | winner       | "Release to seller" (`releasePath()`), with a deadline of `fallback_delay_sec` |
+| `settling`       | seller       | Waiting for the winner, with a countdown to the fallback                       |
+| `fallback-offer` | runner-up    | Accept or decline settlement at their own bid                                  |
+| `refund-pending` | losers       | Locked until `locktime`                                                        |
+| `settled`        | buyer/seller | Shipping handoff opens                                                         |
+
+`releasePath()` and `claimRefund()` are added to `AuctionPageActions`. Both route through the existing settlement
+and wallet paths. Like every money step, they render only in `AuctionSystemLayer` and are never blocks.
+
+**A7. The demo learns the real rules.** `demoEngine.ts` gains `rules: 'arcade' | 'protocol'`. `arcade` is the
+current stage 1 behaviour. `protocol` mirrors A1 to A6: a curve floor, locked-until-locktime, pending then valid, a
+settling step and a runner-up fallback. The preview gets a toggle so playtests can compare them. The engine-contract
+tests run on both modes.
+
+**A8. Parity and tests.** For the same fixture events, every layout must show the same `phase`, current bid,
+`nextMinimumBidSats`, `curveFloorSats` and viewer lock. The stage 2 builder `buildAuctionLotView` is a pure function
+with fixtures for:
+
+- pending, valid and invalid bids
+- a bid below the curve floor
+- a three-leg rebid chain
+- settlement
+- a fallback after `fallback_delay_sec`
+- reserve not met
+- seller offline, where everything refunds at locktime
+
+The E2E auction specs run once per layout, with video.
+
+### Consequences
+
+- Real lots stop over-promising: there is no instant refund and no clock extension.
+- Final-call bidding needs clearer copy, because "valid but not leading" is a new idea for bidders.
+- The demo stays fun in `arcade` mode, while `protocol` mode lets the team test the real experience on fake sats first.
+- Before a real-money lot uses a custom layout, the system layer must pass a z-order audit: no seller block can cover
+  it.
